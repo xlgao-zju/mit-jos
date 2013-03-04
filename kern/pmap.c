@@ -99,6 +99,7 @@ boot_alloc(uint32_t n)
 	// to a multiple of PGSIZE.
 	//
 	// LAB 2: Your code here.
+	nextfree = ROUNDUP((char *) nextfree, PGSIZE);
 	result = nextfree;
 	nextfree += n;
 	if (PADDR(nextfree) >= npages * PGSIZE)
@@ -147,11 +148,12 @@ mem_init(void)
 	// each physical page, there is a corresponding struct PageInfo in this
 	// array.  'npages' is the number of physical pages in memory.
 	// Your code goes here:
-	pages = (struct PageInfo *) boot_alloc(npages * sizeof(struct PageInfo));
+	pages = boot_alloc(npages * sizeof(struct PageInfo));
 
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
 	// LAB 3: Your code here.
+	envs = boot_alloc(NENV * sizeof(struct Env));
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -177,7 +179,7 @@ mem_init(void)
 	// Your code goes here:
 	boot_map_region(kern_pgdir, UPAGES,
 			ROUNDUP(npages * sizeof(struct PageInfo), PGSIZE),
-			PADDR(pages), PTE_U | PTE_P);
+			PADDR(pages), PTE_U);
 
 	//////////////////////////////////////////////////////////////////////
 	// Map the 'envs' array read-only by the user at linear address UENVS
@@ -186,6 +188,9 @@ mem_init(void)
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 3: Your code here.
+	boot_map_region(kern_pgdir, UENVS,
+			ROUNDUP(NENV * sizeof(struct Env), PGSIZE),
+			PADDR(envs), PTE_U);
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -360,7 +365,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 			return NULL;
 		if(((pp = page_alloc(ALLOC_ZERO))) == 0)
 			return NULL;
-		pgdir[PDX(va)] = page2pa(pp) | PTE_SYSCALL;
+		pgdir[PDX(va)] = page2pa(pp) | PTE_U | PTE_W | PTE_P;
 		pp->pp_ref = 1;
 		pte = page2kva(pp);
 	}else
@@ -384,8 +389,10 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 	// Fill this function in
 	uint32_t i;
 	pte_t *pte;
-		for(i = 0; i < size; i += PGSIZE){
-			pte = pgdir_walk(pgdir, (void *)(va + i), 1);
+	if(size % PGSIZE != 0)
+		panic("Size is not a multiple of PGSIZE.");
+	for(i = 0; i < size; i += PGSIZE){
+		pte = pgdir_walk(pgdir, (void *)(va + i), 1);
 		if(pte == NULL)
 			panic("Can't get page table page!");
 		*pte = (pa + i) | perm | PTE_P;
@@ -529,7 +536,23 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
-
+	int i;
+	uint32_t addr;
+	pte_t *pte;
+	
+	addr = (uint32_t)ROUNDDOWN(va, PGSIZE);
+	perm |= PTE_P;
+	for (i = 0; i <= len / PGSIZE; i++, addr += i * PGSIZE){
+		if (va >= (void *)ULIM){
+			user_mem_check_addr = (uintptr_t)va > addr ? (uintptr_t)va : addr;
+			return -E_FAULT;
+		}
+		pte = pgdir_walk(env->env_pgdir, (void *)addr, 0);
+		if (pte == NULL || (*pte & perm) != perm) {
+			user_mem_check_addr = (uintptr_t)va > addr ? (uintptr_t)va : addr;
+			return -E_FAULT;
+		}
+	}
 	return 0;
 }
 

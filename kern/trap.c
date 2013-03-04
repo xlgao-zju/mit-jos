@@ -65,6 +65,30 @@ trap_init(void)
 	extern struct Segdesc gdt[];
 
 	// LAB 3: Your code here.
+	extern int idivide[], idebug[], inmi[], ibrkpt[], ioflow[], ibound[], iillop[],
+		   idevice[], idblflt[], itss[], isegnp[], istack[], igpflt[], ipgflt[], 
+		   ifperr[], ialing[], imchk[], isimderr[], isyscall[], idefault[];
+
+	SETGATE(idt[0], 0, GD_KT, idivide, 0);
+	SETGATE(idt[1], 0, GD_KT, idebug, 0);
+	SETGATE(idt[2], 0, GD_KT, inmi, 0);
+	SETGATE(idt[3], 0, GD_KT, ibrkpt, 3);
+	SETGATE(idt[4], 0, GD_KT, ioflow, 0);
+	SETGATE(idt[5], 0, GD_KT, ibound, 0);
+	SETGATE(idt[6], 0, GD_KT, iillop, 0);
+	SETGATE(idt[7], 0, GD_KT, idevice, 0);
+	SETGATE(idt[8], 0, GD_KT, idblflt, 0);
+	SETGATE(idt[10], 0, GD_KT, itss, 0);
+	SETGATE(idt[11], 0, GD_KT, isegnp, 0);
+	SETGATE(idt[12], 0, GD_KT, istack, 0);
+	SETGATE(idt[13], 0, GD_KT, igpflt, 0);
+	SETGATE(idt[14], 0, GD_KT, ipgflt, 0);
+	SETGATE(idt[16], 0, GD_KT, ifperr, 0);
+	SETGATE(idt[17], 0, GD_KT, ialing, 0);
+	SETGATE(idt[18], 0, GD_KT, imchk, 0);
+	SETGATE(idt[19], 0, GD_KT, isimderr, 0);
+	SETGATE(idt[48], 0, GD_KT, isyscall, 3);
+	SETGATE(idt[500], 0, GD_KT, idefault, 0);	
 
 	// Per-CPU setup 
 	trap_init_percpu();
@@ -143,6 +167,22 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
+	switch (tf->tf_trapno) {
+		case T_BRKPT:
+			monitor(tf);
+			return;
+		case T_PGFLT:
+			page_fault_handler(tf);
+			return;
+		case T_SYSCALL:
+			tf->tf_regs.reg_eax = syscall(tf->tf_regs.reg_eax,
+					tf->tf_regs.reg_edx,
+					tf->tf_regs.reg_ecx,
+					tf->tf_regs.reg_ebx,
+					tf->tf_regs.reg_edi,
+					tf->tf_regs.reg_esi);
+			return;	
+		}
 
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
@@ -204,6 +244,10 @@ page_fault_handler(struct Trapframe *tf)
 	// Handle kernel-mode page faults.
 
 	// LAB 3: Your code here.
+	if (tf->tf_cs == GD_KT){
+		print_trapframe(tf);
+		panic("kernel page fault va %08x\n", fault_va);
+	}
 
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.

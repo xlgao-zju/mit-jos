@@ -192,7 +192,7 @@ cga_putc(int c)
 		break;
 	}
 
-	// What is the purpose of this?
+	// What is the purpose of this?    滚屛
 	if (crt_pos >= CRT_SIZE) {
 		int i;
 

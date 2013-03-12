@@ -269,6 +269,11 @@ mem_init_mp(void)
 	//     Permissions: kernel RW, user NONE
 	//
 	// LAB 4: Your code here:
+	int i;
+	for (i = 0; i < NCPU; i++)
+		boot_map_region(kern_pgdir,
+				KSTACKTOP - i * (KSTKSIZE + KSTKGAP) - KSTKSIZE,
+				ROUNDUP(KSTKSIZE, PGSIZE), PADDR(percpu_kstacks[i]), PTE_W);
 
 }
 
@@ -310,13 +315,13 @@ page_init(void)
 	// free pages!
 	size_t i, n;
 	for (i = 0; i < npages; i++) {
-		pages[i].pp_ref = 0;
-		pages[i].pp_link = page_free_list;
-		page_free_list = &pages[i];
-	}
-    n =  ROUNDUP(PADDR(pages + npages * sizeof(struct PageInfo)), PGSIZE) / PGSIZE;
-	pages[n].pp_link = &pages[npages_basemem-1];
-	pages[1].pp_link = NULL;
+		pages[i].pp_ref = 0;		
+		pages[i].pp_link = page_free_list;		
+		page_free_list = &pages[i];	
+	}    
+	n =  ROUNDUP(PADDR(pages + npages * sizeof(struct PageInfo)), PGSIZE) / PGSIZE;	
+	pages[n].pp_link = &pages[npages_basemem-1];	
+	pages[MPENTRY_PADDR / PGSIZE + 1].pp_link = &pages[MPENTRY_PADDR / PGSIZE - 1];	pages[1].pp_link = NULL;
 }
 
 //
@@ -528,7 +533,8 @@ page_remove(pde_t *pgdir, void *va)
 
 	if((pp = page_lookup(pgdir, (void *)va, &pte)) == 0)
 		return;
-
+	if (pte == NULL)
+		return;
 	page_decref(pp);
 	*pte = 0;
 	tlb_invalidate(pgdir, va);
@@ -578,7 +584,14 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	panic("mmio_map_region not implemented");
+	void *result;
+	
+	size = ROUNDUP(size, PGSIZE);
+	boot_map_region(kern_pgdir, base, size, pa, PTE_PCD|PTE_PWT|PTE_W);
+	result = (void *)base;
+	base += size;
+	return result;
+	//panic("mmio_map_region not implemented");
 }
 
 static uintptr_t user_mem_check_addr;

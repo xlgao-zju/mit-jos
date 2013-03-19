@@ -74,7 +74,8 @@ trap_init(void)
 	// LAB 3: Your code here.
 	extern int idivide[], idebug[], inmi[], ibrkpt[], ioflow[], ibound[], iillop[],
 		   idevice[], idblflt[], itss[], isegnp[], istack[], igpflt[], ipgflt[], 
-		   ifperr[], ialing[], imchk[], isimderr[], isyscall[], idefault[];
+		   ifperr[], ialing[], imchk[], isimderr[], isyscall[], idefault[],
+		   itimer[], ikbd[], iserial[], ispurious[], iide[], ierror[];
 
 	SETGATE(idt[0], 0, GD_KT, idivide, 0);
 	SETGATE(idt[1], 0, GD_KT, idebug, 0);
@@ -96,6 +97,14 @@ trap_init(void)
 	SETGATE(idt[19], 0, GD_KT, isimderr, 0);
 	SETGATE(idt[48], 0, GD_KT, isyscall, 3);
 	SETGATE(idt[500], 0, GD_KT, idefault, 0);	
+
+	SETGATE(idt[32], 0, GD_KT, itimer, 0);
+	SETGATE(idt[33], 0, GD_KT, ikbd, 0);
+	SETGATE(idt[36], 0, GD_KT, iserial, 0);
+	SETGATE(idt[39], 0, GD_KT, ispurious, 0);
+	SETGATE(idt[46], 0, GD_KT, iide, 0);
+	SETGATE(idt[51], 0, GD_KT, ierror, 0);
+
 
 	// Per-CPU setup 
 	trap_init_percpu();
@@ -348,6 +357,29 @@ page_fault_handler(struct Trapframe *tf)
 	//   (the 'tf' variable points at 'curenv->env_tf').
 
 	// LAB 4: Your code here.
+	struct UTrapframe *uframe;
+	
+	if (curenv->env_pgfault_upcall != NULL){
+		if (tf->tf_esp >= UXSTACKTOP-PGSIZE && tf->tf_esp <= UXSTACKTOP -1)
+			uframe = (void *)tf->tf_esp - 4 - sizeof(struct UTrapframe);
+		else
+			uframe = (void *)UXSTACKTOP - sizeof(struct UTrapframe);
+
+	user_mem_assert(curenv,(void *)(UXSTACKTOP -4), 4, 0);	
+
+	uframe->utf_fault_va = fault_va;
+	uframe->utf_err = tf->tf_err;
+	uframe->utf_regs = tf->tf_regs;
+	uframe->utf_eip = tf->tf_eip;
+	uframe->utf_eflags = tf->tf_eflags;
+
+	uframe->utf_esp = tf->tf_esp;
+
+	tf->tf_esp = (uintptr_t)uframe;
+	tf->tf_eip = (uintptr_t)curenv->env_pgfault_upcall;
+	
+	env_run(curenv);
+	}
 
 	// Destroy the environment that caused the fault.
 	cprintf("[%08x] user fault va %08x ip %08x\n",

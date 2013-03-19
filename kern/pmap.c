@@ -321,7 +321,8 @@ page_init(void)
 	}    
 	n =  ROUNDUP(PADDR(pages + npages * sizeof(struct PageInfo)), PGSIZE) / PGSIZE;	
 	pages[n].pp_link = &pages[npages_basemem-1];	
-	pages[MPENTRY_PADDR / PGSIZE + 1].pp_link = &pages[MPENTRY_PADDR / PGSIZE - 1];	pages[1].pp_link = NULL;
+	pages[MPENTRY_PADDR / PGSIZE + 1].pp_link = &pages[MPENTRY_PADDR / PGSIZE - 1];	
+	pages[1].pp_link = NULL;
 }
 
 //
@@ -482,7 +483,7 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 	}
 	pp->pp_ref++;	
 	*pte = page2pa(pp) | perm | PTE_P;
-		return 0;
+	return 0;
 }
 
 //

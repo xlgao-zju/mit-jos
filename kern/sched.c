@@ -35,17 +35,24 @@ sched_yield(void)
 		curenv = envs;
 
 	for (i = curenv - envs + 1; i < NENV; i++)
-		if (envs[i].env_status == ENV_RUNNABLE)
+		if (envs[i].env_status == ENV_RUNNABLE){
 			env_run(&envs[i]);
+			break;
+		}
 
 	for (i = 0; i <= curenv - envs; i++)
-		if (envs[i].env_status == ENV_RUNNABLE)
+		if (envs[i].env_status == ENV_RUNNABLE){
 			env_run(&envs[i]);
+			break;
+		}
+	
 	if (curenv != NULL)
 	for (i = 0; i < NENV; i++) 
 		if (envs[i].env_status == ENV_RUNNING &&
-				envs[i].env_cpunum == cpunum())
+				envs[i].env_cpunum == cpunum()){
 			env_run(&envs[i]);
+			break;
+		}
 
 	// sched_halt never returns
 	sched_halt();

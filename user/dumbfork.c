@@ -26,7 +26,6 @@ void
 duppage(envid_t dstenv, void *addr)
 {
 	int r;
-
 	// This is NOT what you should do in your fork.
 	if ((r = sys_page_alloc(dstenv, addr, PTE_P|PTE_U|PTE_W)) < 0)
 		panic("sys_page_alloc: %e", r);
@@ -35,6 +34,8 @@ duppage(envid_t dstenv, void *addr)
 	memmove(UTEMP, addr, PGSIZE);
 	if ((r = sys_page_unmap(0, UTEMP)) < 0)
 		panic("sys_page_unmap: %e", r);
+			
+
 }
 
 envid_t
@@ -61,7 +62,7 @@ dumbfork(void)
 		thisenv = &envs[ENVX(sys_getenvid())];
 		return 0;
 	}
-
+	cprintf("envid:%d\n", envid);
 	// We're the parent.
 	// Eagerly copy our entire address space into the child.
 	// This is NOT what you should do in your fork implementation.
